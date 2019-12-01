@@ -4,7 +4,7 @@ import time
 import pickle
 import numpy as np
 from itertools import product
-from math import cos, sin, pi, sqrt 
+from math import cos, sin, pi, sqrt
 
 from plotting_utils import draw_plan
 from priority_queue import priority_dict
@@ -128,11 +128,11 @@ class AStarPlanner(object):
 
         # Q is a mutable priority queue implemented as a dictionary
         Q = priority_dict()
-        Q[start_state] = 0.0
+        Q[start_state] = sqrt((start_state.x - dest_state.x)**2 + (start_state.y - dest_state.y)**2)
 
         # Array that contains the optimal distance we've found from the starting state so far
         best_dist_found = float("inf") * np.ones((world.shape[0], world.shape[1]))
-        best_dist_found[start_state.x, start_state.y] = 0
+        best_dist_found[start_state.x, start_state.y] = Q[start_state]
 
         # Boolean array that is true iff the distance to come of a state has been
         # finalized
@@ -163,7 +163,8 @@ class AStarPlanner(object):
                     continue
 
                 transition_distance = sqrt((ns.x - s.x)**2 + (ns.y - s.y)**2)
-                alternative_best_dist_ns = best_dist_found[s.x, s.y] + transition_distance
+                heuristic = sqrt((ns.x - dest_state.x)**2 + (ns.y - dest_state.y)**2)
+                alternative_best_dist_ns = best_dist_found[s.x, s.y] + transition_distance + heuristic
 
                 # if the state ns has not been visited before or we just found a shorter path
                 # to visit it then update its priority in the queue, and also its
@@ -193,7 +194,7 @@ if __name__ == "__main__":
 
     # TODO: Change the goal state to 3 different values, saving and running between each
     # in order to produce your images to submit
-    dest_state = State(500, 500)
+    dest_state = State(300, 600)
     
     plan = astar.plan(start_state, dest_state)
     draw_plan(world, plan)

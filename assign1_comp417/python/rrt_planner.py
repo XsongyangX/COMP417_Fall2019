@@ -7,7 +7,7 @@ import random
 import cv2
 
 from itertools import product
-from math import cos, sin, pi, sqrt 
+from math import cos, sin, pi, sqrt, atan, pi
 
 from plotting_utils import draw_plan
 from priority_queue import priority_dict
@@ -72,8 +72,13 @@ class RRTPlanner(object):
         """
         #TODO: make sure you're not exceeding the row and columns bounds
         # x must be in {0, cols-1} and y must be in {0, rows -1}
-        x = 0
-        y = 0
+        
+        x = random.randint(0, self.world.shape[0] - 1)
+        y = random.randint(0, self.world.shape[1] - 1)
+        
+        while not self.state_is_free(State(x,y,None)):
+            x = random.randint(0, self.world.shape[0] - 1)
+            y = random.randint(0, self.world.shape[1] - 1)
         return State(x, y, None)
            
 
@@ -122,10 +127,50 @@ class RRTPlanner(object):
         #TODO: populate x and y properly according to the description above.
         #Note: x and y are integers and they should be in {0, ..., cols -1}
         # and {0, ..., rows -1} respectively
-        x = 0
-        y = 0
+        s_new = State(0, 0, s_nearest)
+        
+        # s_rand and s_nearest are within max_radius of each other
+        if s_rand.euclidean_distance(s_nearest) <= max_radius:
+            s_new.x = s_rand.x
+            s_new.y = s_rand.y
+        
+        # interpolate using trigonometry
+        else:
+            # get the angle
+            try:
+                angle = atan((s_rand.y - s_nearest.y)/(s_rand.x - s_nearest.x))
+            except ZeroDivisionError:
+                s_new.x = s_nearest.x
+                s_new.y = s_nearest.y + max_radius
 
-        s_new = State(x, y, s_nearest)
+                s_new.x = int(s_new.x)
+                s_new.y = int(s_new.y)
+                return s_new
+
+            # add offsets to the angle, if necessary, depending on the quadrant
+            # that the s_rand position is in
+            if s_rand.x >= s_nearest.x:
+                # to the right and top of s_nearest, no offset
+                if s_rand.y >= s_nearest.y:
+                    pass
+                # to the right and bottom of s_nearest, invert sign
+                else:
+                    angle = -angle
+            else:
+                # to the left and top of s_nearest, add pi rad
+                if s_rand.y >= s_nearest.y:
+                    angle = angle + pi
+                # to the left and bottom of s_nearest, add 2pi rad
+                else:
+                    angle = angle + 2 * pi
+
+            # take the cosine and sine of the angle, multiply by the radius
+            s_new.x = s_nearest.x + cos(angle) * max_radius
+            s_new.y = s_nearest.y + sin(angle) * max_radius
+
+            s_new.x = int(s_new.x)
+            s_new.y = int(s_new.y)
+
         return s_new
 
 
@@ -139,10 +184,64 @@ class RRTPlanner(object):
         if not (self.state_is_free(s_to)):
             return False
 
+        # set the max checks and angle variable
         max_checks = 10
+        angle = 0
+        s_new = State(0,0,None) # dummy variable
+
+        # extract the angle
+        try:
+            angle = atan((s_to.y - s_from.y)/(s_to.x - s_from.x))
+
+            # add offsets to the angle, if necessary, depending on the quadrant
+            # that the s_to position is in
+            if s_to.x >= s_from.x:
+                # to the right and top of s_from, no offset
+                if s_to.y >= s_from.y:
+                    pass
+                # to the right and bottom of s_from, invert sign
+                else:
+                    angle = -angle
+            else:
+                # to the left and top of s_from, add pi rad
+                if s_to.y >= s_from.y:
+                    angle = angle + pi
+                # to the left and bottom of s_from, add 2pi rad
+                else:
+                    angle = angle + 2 * pi
+
+        # moving straight up
+        except ZeroDivisionError:
+            for i in xrange(max_checks):
+                distance = float(i)/max_checks * s_from.euclidean_distance(s_to)
+
+                s_new.x = s_from.x
+                s_new.y = s_from.y + distance
+
+                s_new.x = int(s_new.x)
+                s_new.y = int(s_new.y)
+
+                if self.state_is_free(s_new):
+                    continue
+                return False
+            return True
+
+        # all other directions
         for i in xrange(max_checks):
-            # TODO: check if the inteprolated state that is float(i)/max_checks * dist(s_from, s_new)
+            # TODO: check if the interpolated state that is float(i)/max_checks * dist(s_from, s_new)
             # away on the line from s_from to s_new is free or not. If not free return False
+            
+            distance = float(i)/max_checks * s_from.euclidean_distance(s_to)
+
+            # take the cosine and sine of the angle, multiply by the radius
+            s_new.x = s_from.x + cos(angle) * distance
+            s_new.y = s_from.y + sin(angle) * distance
+
+            s_new.x = int(s_new.x)
+            s_new.y = int(s_new.y)
+
+            if self.state_is_free(s_new):
+                continue
             return False
             
         # Otherwise the line is free, so return true
@@ -171,8 +270,10 @@ class RRTPlanner(object):
 
             # TODO: Use the methods of this class as in the slides to
             # compute s_new
-            s_nearest = None
-            s_new = None
+
+            s_rand = self.sample_state()
+            s_nearest = self.find_closest_state(tree_nodes, s_rand)
+            s_new = self.steer_towards(s_nearest, s_rand, max_steering_radius)
             
             if self.path_is_obstacle_free(s_nearest, s_new):
                 tree_nodes.add(s_new)
@@ -192,7 +293,7 @@ class RRTPlanner(object):
             # Keep showing the image for a bit even
             # if we don't add a new node and edge
             cv2.imshow('image', img)
-            cv2.waitKey(10)
+            #cv2.waitKey(10)
 
         draw_plan(img, plan, bgr=(0,0,255), thickness=2)
         cv2.waitKey(0)
@@ -213,7 +314,7 @@ if __name__ == "__main__":
     rrt = RRTPlanner(world)
 
     start_state = State(10, 10, None)
-    dest_state = State(500, 500, None)
+    dest_state = State(500, 100, None)
 
     max_num_steps = 1000     # max number of nodes to be added to the tree 
     max_steering_radius = 30 # pixels
@@ -223,4 +324,5 @@ if __name__ == "__main__":
                     max_num_steps,
                     max_steering_radius,
                     dest_reached_radius)
+    #draw_plan(world, plan)
     
