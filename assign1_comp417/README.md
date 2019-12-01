@@ -1,6 +1,12 @@
-# Path Planning and Control Assignment 
+# Assignment 1 - Path Planning Assignment 
 
-## Gazebo Path Visualization 
+## Questions 1 and 2
+
+**Please see assignment instructions under MyCourses.** 
+
+## Question 3 Draft (REMOVED)
+
+### Gazebo Path Visualization 
 - To visualize your path in the Gazebo simulator, launch the `gazebo_plan_visualization` script: 
 
 
@@ -41,8 +47,5 @@ waypoint_dist_threshold | Distance to waypoint before it is concidered satisfied
 stop_to_turn_threshold | Threshold on current and target angle error when moving towards a waypoint that vehicle will stop throttle and focus solely on turning to align itself with the waypoint | 0.3491 | 
 bbox_x | X direction bounding box of car (mirrored in -x direction) | 0.205 | 
 bbox_y | Y direction bounding box of car (mirrored in -y direction) | 0.165 | 
-
- 
-
 
 
